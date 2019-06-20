@@ -1,0 +1,285 @@
+# DragonMageusing System.Collections;
+
+using System.Collections.Generic;
+
+using UnityEngine;
+
+ 
+
+public class MoveManager : MonoBehaviour
+
+{
+
+    public Transform[] pos;
+
+    public Transform target;
+
+    public Transform dragon;
+
+    public Transform player;
+
+    public Transform mouse;
+
+    public ParticleSystem breath;
+
+    public GameObject fireBall;
+
+ 
+
+    public float time;
+
+    public STATE state;
+
+ 
+
+    public enum STATE
+
+    {
+
+        WANDER,
+
+        TO_PLAYER,
+
+        ATTACK
+
+    }
+
+    
+
+    void Start()
+
+    {
+
+        state = STATE.WANDER;
+
+        target = pos[0];
+
+    }
+
+    
+
+    void Update()
+
+    {
+
+        if (GameManager.gameState != GAME_STATE.GAME)
+
+            return;
+
+ 
+
+        time += Time.deltaTime;
+
+ 
+
+        if (state == STATE.WANDER)
+
+        {
+
+ 
+
+            if (Vector3.Distance(dragon.position, target.position) <= 4)
+
+            {
+
+                target = pos[Random.Range(0, pos.Length)];
+
+            }
+
+ 
+
+            if (time >= 7)
+
+            {
+
+                state = STATE.TO_PLAYER;
+
+                time = 0;
+
+                target = player;
+
+            }
+
+        }
+
+        else if (state == STATE.TO_PLAYER)
+
+        {
+
+            if (time >= 1.2f)
+
+            {
+
+                state = STATE.ATTACK;
+
+                time = 0;
+
+                breath.Play();
+
+ 
+
+                Vector3 toPlayer = (player.position - mouse.position).normalized;
+
+                for (int i = 0; i < 9; i++)
+
+                {
+
+                    while(true)
+
+                    {
+
+                        Vector3 dir = new Vector3(Random.Range(-10, 10), Random.Range(-10, 10), Random.Range(-10, 10));
+
+                        dir = dir.normalized;
+
+ 
+
+                        if (Mathf.Acos(Vector3.Dot(toPlayer, dir)) <= Mathf.PI / 9)
+
+                        {
+
+                            GameObject newFire = Instantiate(fireBall);
+
+                            newFire.transform.position = mouse.position;
+
+                            newFire.GetComponent<DragonFireBall>().dir = dir;
+
+                            break;
+
+                        }
+
+                    }
+
+                }
+
+ 
+
+                GameObject newFire1 = Instantiate(fireBall);
+
+                newFire1.transform.position = mouse.position;
+
+                newFire1.GetComponent<DragonFireBall>().dir = toPlayer;
+
+            }
+
+        }
+
+        else if (state == STATE.ATTACK)
+
+        {
+
+            if (time >= 1)
+
+            {
+
+                target = pos[Random.Range(0, pos.Length)];
+
+                state = STATE.WANDER;
+
+                time = 0;
+
+            }
+
+        }
+
+    }
+
+}
+
+-----------------------------------------------------------------------------------------
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class DragonMove : MonoBehaviour
+{
+    public MoveManager moveManager;
+
+    void Update()
+    {
+        transform.position += transform.forward * Time.deltaTime * 16;
+
+        var preRot = transform.rotation;
+        transform.LookAt(moveManager.target);
+
+        transform.rotation = Quaternion.Slerp(preRot, transform.rotation, Time.deltaTime);
+    }
+}
+-------------------------------------------------
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine.UI;
+using UnityEngine;
+
+public class Dragonhp : MonoBehaviour
+{
+    public float hp = 2000;
+    public GameObject cam;
+    public GameObject text;
+    public GameObject dragon;
+    public GameObject res;
+
+    void OnTriggerEnter(Collider c)
+    {
+        if (c.gameObject.CompareTag("FireBall"))
+        {
+            Destroy(c.gameObject);
+            hp -= c.GetComponent<FireBall>().dam;
+            Debug.Log(hp);
+        }
+
+        if (hp <= 0)
+        {
+            GameManager.gameState = GAME_STATE.END;
+            cam.transform.position = new Vector3(0,1.3f,0);
+            text.SetActive(true);
+            dragon.SetActive(false);
+            res.SetActive(true);
+            text.GetComponent<Text>().text = "YOU WIN!";
+            Destroy(gameObject);
+        }
+    }
+}
+------------------------------------------
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class DragonFireBall : MonoBehaviour
+{
+    public Vector3 dir;
+    public float time;
+    public GameObject player;
+    public PlayerCol playerhp;
+    public GameObject expPrefab;
+    
+    void Awake()
+    {
+        player = GameObject.Find("[CameraRig]").transform.Find("Camera").gameObject;
+        playerhp = player.GetComponent<PlayerCol>();
+    }
+
+    void Update()
+    {
+        time += Time.deltaTime;
+        transform.position += dir * Time.deltaTime * 30;
+        if (time >= 5) Destroy(gameObject);
+        if (Vector3.Distance(transform.position, player.transform.position) <= 3)
+        {
+            playerhp.hp -= 10;
+            Destroy(gameObject);
+            Debug.Log(playerhp.hp);
+        }
+    }
+
+    void OnDestroy()
+    {
+        GameObject e = Instantiate(expPrefab);
+        e.transform.position = transform.position;
+    }
+
+    void OnTriggerEnter(Collider c)
+    {
+        Destroy(gameObject);
+    }
+}
